@@ -1,0 +1,29 @@
+name: Deploy
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+          fetch-depth: 0
+
+      - name: Deploy on server
+        env:
+          DEPLOY_KEY: ${{ secrets.KEY }}
+          KNOWN_HOSTS: ${{ secrets.KNOWN_HOSTS }}
+          REMOTE: ${{ secrets.USERNAME }}@${{ secrets.HOST }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" >> ~/.ssh/known_hosts
+          rsync -rlptzv --delete --chmod=D755,F644 \
+            -e "ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes" \
+            ./ "$REMOTE":/
